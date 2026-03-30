@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Winza Keno Premium V11</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --gold: #ffcc00;
+            --green: #00ff88;
+            --red: #ff4444;
+            --card: #161b22;
+            --num-bg: #21262d;
+            --text: #c9d1d9;
+            --panel-bg: rgba(13, 17, 23, 0.98);
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0; padding: 0;
+            display: flex; flex-direction: column; align-items: center;
+            user-select: none; overflow-x: hidden;
+        }
+
+        /* Registration */
+        #regOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg); z-index: 9999;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .reg-card {
+            background: var(--card); padding: 35px; border-radius: 25px;
+            border: 2px solid var(--gold); text-align: center; width: 85%;
+        }
+
+        /* Header */
+        .header {
+            width: 100%; background: #000; padding: 15px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 2px solid #333; box-sizing: border-box;
+        }
+        .logo { font-size: 22px; font-weight: 900; color: var(--gold); font-style: italic; }
+        .bal-amt { color: var(--green); font-size: 24px; font-weight: bold; }
+
+        /* Display Board */
+        .display-board {
+            width: 95%; background: var(--card); margin: 15px 0;
+            padding: 20px; border-radius: 18px; border: 1px solid #30363d;
+            text-align: center;
+        }
+        #timer { font-size: 55px; font-weight: bold; color: #fff; }
+        #drawNum { font-size: 55px; font-weight: bold; color: var(--gold); display: none; }
+        
+        .balls-row {
+            display: flex; overflow-x: auto; gap: 8px; padding: 10px;
+            min-height: 45px; justify-content: flex-start;
+        }
+        .ball {
+            min-width: 38px; height: 38px; background: #fff; border: 2px solid #000;
+            border-radius: 50%; color: #000; display: flex; align-items: center;
+            justify-content: center; font-weight: bold; animation: pop 0.4s;
+        }
+
+        /* Grid */
+        .keno-grid {
+            display: grid; grid-template-columns: repeat(8, 1fr);
+            gap: 6px; width: 95%; padding: 10px;
+        }
+        .cell {
+            background: var(--num-bg); padding: 16px 0; border-radius: 10px;
+            font-weight: bold; text-align: center; border-bottom: 4px solid rgba(0,0,0,0.5);
+        }
+        .cell.selected { background: var(--gold); color: #000; }
+        .cell.winner { background: var(--green) !important; color: #000; box-shadow: 0 0 18px var(--green); }
+
+        /* Input & Buttons */
+        .input-bet {
+            width: 80%; padding: 15px; margin: 10px 0;
+            background: #000; border: 2px solid #30363d;
+            color: var(--gold); font-size: 24px; text-align: center; border-radius: 12px;
+        }
+        .btn {
+            width: 95%; padding: 18px; border-radius: 15px; border: none;
+            font-weight: bold; font-size: 17px; cursor: pointer; margin-bottom: 12px;
+        }
+        .btn-play { background: linear-gradient(180deg, #238636, #2ea043); color: white; }
+
+        /* Admin Dashboard & Table */
+        .panel {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--panel-bg); z-index: 5000; display: none;
+            padding: 20px; box-sizing: border-box; overflow-y: auto;
+        }
+        .admin-table {
+            width: 100%; border-collapse: collapse; margin-top: 20px;
+            background: var(--card); border-radius: 12px; overflow: hidden;
+            border: 1px solid #333;
+        }
+        .admin-table th { background: #21262d; color: var(--gold); padding: 15px; text-align: left; }
+        .admin-table td { border-bottom: 1px solid #30363d; padding: 12px; font-size: 14px; }
+        
+        .feed { width: 95%; height: 140px; background: var(--card); margin-top: 10px; border-radius: 12px; padding: 10px; overflow: hidden; }
+        @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    </style>
+</head>
+<body ondblclick="openAdmin()">
+
+<div id="regOverlay">
+    <div class="reg-card">
+        <h1 style="color:var(--gold)">WINZA KENO</h1>
+        <input type="number" id="regPhone" class="input-bet" placeholder="09..." style="width:90%">
+        <button class="btn btn-play" onclick="register()">ይመዝገቡ</button>
+    </div>
+</div>
+
+<div class="header">
+    <div class="logo">Winza Keno</div>
+    <div class="bal-box">
+        <div id="uID" style="font-size:11px; color:#888;">ID: --</div>
+        <div class="bal-amt"><span id="balance">0.00</span> ETB</div>
+    </div>
+</div>
+
+<div class="display-board">
+    <div id="phase" style="color:var(--gold); font-size:13px; font-weight:bold;">BETTING PHASE</div>
+    <div id="timer">60</div>
+    <div id="drawNum">--</div>
+    <div class="balls-row" id="ballRow"></div>
+</div>
+
+<input type="number" id="betAmt" class="input-bet" value="30">
+<div class="keno-grid" id="grid"></div>
+<button id="playBtn" class="btn btn-play" onclick="placeBet()">PLACE BET</button>
+
+<div style="width:95%; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+    <button class="btn" style="background:var(--green); color:#000" onclick="showP('depP')">Deposit</button>
+    <button class="btn" style="background:var(--red); color:#fff" onclick="showP('withP')">Withdraw</button>
+</div>
+
+<div class="feed" id="feedList"></div>
+
+<div id="adminP" class="panel">
+    <h2 style="color:var(--gold)">Admin Dashboard</h2>
+    <div style="background:var(--card); padding:20px; border-radius:15px; border:1px solid #333;">
+        <input type="text" id="admTarg" class="input-bet" placeholder="የተጫዋች ስልክ (ID)" style="width:100%; font-size:16px;">
+        <input type="number" id="admAmt" class="input-bet" placeholder="የብር መጠን" style="width:100%; font-size:16px;">
+        <button class="btn btn-play" onclick="admAdd()">ገንዘብ ሙላ</button>
+    </div>
+
+    <h3>Withdraw Requests</h3>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>ID (ስልክ)</th>
+                <th>መጠን</th>
+                <th>አካውንት</th>
+            </tr>
+        </thead>
+        <tbody id="withTableBody"></tbody>
+    </table>
+    <button class="btn" style="background:#444; color:white; margin-top:20px;" onclick="closeP()">ዝጋ</button>
+</div>
+
+<div id="depP" class="panel">
+    <h2>Deposit</h2>
+    <p>በቴሌብር ወደ <b>0998012433</b> ይላኩ።</p>
+    <button class="btn" style="background:#444; color:white" onclick="closeP()">ዝጋ</button>
+</div>
+
+<div id="withP" class="panel">
+    <h2>Withdraw</h2>
+    <input type="number" id="wAmt" class="input-bet" placeholder="መጠን" style="width:100%">
+    <input type="text" id="wAcc" class="input-bet" placeholder="የባንክ መረጃ" style="width:100%">
+    <button class="btn" style="background:var(--red); color:white" onclick="sendWith()">ጥያቄ ላክ</button>
+    <button class="btn" style="background:#444; color:white" onclick="closeP()">ዝጋ</button>
+</div>
+
+<script>
+    // --- DATABASE ---
+    let allUsers = JSON.parse(localStorage.getItem('winza_v11_all_users')) || {};
+    let allWiths = JSON.parse(localStorage.getItem('winza_v11_all_withs')) || [];
+    let currentUser = JSON.parse(localStorage.getItem('winza_v11_current'));
+    
+    let selected = new Set();
+    let isLive = false;
+    let betCount = 0;
+    let currentBet = 0;
+
+    function register() {
+        const p = document.getElementById('regPhone').value;
+        if(p.length < 10) return alert("ትክክለኛ ስልክ ያስገቡ!");
+        
+        if(!allUsers[p]) {
+            allUsers[p] = { id: p, balance: 50.00, isNew: true };
+        }
+        
+        currentUser = allUsers[p];
+        saveAll();
+        init();
+    }
+
+    function init() {
+        if(currentUser) {
+            document.getElementById('regOverlay').style.display = 'none';
+            document.getElementById('uID').innerText = "ID: " + currentUser.id;
+            updateUI();
+        }
+    }
+
+    function saveAll() {
+        if(currentUser) allUsers[currentUser.id] = currentUser;
+        localStorage.setItem('winza_v11_all_users', JSON.stringify(allUsers));
+        localStorage.setItem('winza_v11_all_withs', JSON.stringify(allWiths));
+        localStorage.setItem('winza_v11_current', JSON.stringify(currentUser));
+    }
+    
+    function updateUI() { document.getElementById('balance').innerText = currentUser.balance.toFixed(2); }
+
+    // Grid
+    const g = document.getElementById('grid');
+    for(let i=1; i<=80; i++) {
+        const d = document.createElement('div');
+        d.className = 'cell'; d.innerText = i; d.id = 'c-'+i;
+        d.onclick = () => {
+            if(isLive || currentBet > 0) return;
+            if(selected.has(i)) { selected.delete(i); d.classList.remove('selected'); }
+            else if(selected.size < 5) { selected.add(i); d.classList.add('selected'); }
+        };
+        g.appendChild(d);
+    }
+
+    function placeBet() {
+        if(selected.size !== 2 && selected.size !== 5) return alert("2 ወይም 5 ይምረጡ!");
+        const a = parseFloat(document.getElementById('betAmt').value);
+        if(currentUser.balance < a) return alert("ባላንስ የሎትም!");
+        currentBet = a; currentUser.balance -= a; betCount++;
+        saveAll(); updateUI();
+        document.getElementById('playBtn').disabled = true;
+        addF("My Ticket", a, Array.from(selected));
+    }
+
+    function addF(u, a, ns) {
+        const fl = document.getElementById('feedList');
+        const r = document.createElement('div');
+        r.style = "font-size:12px; padding:8px; border-bottom:1px solid #333; display:flex; justify-content:space-between;";
+        r.innerHTML = `<span><b>${u}</b>: ${a} ETB</span><span style="color:var(--gold)">${ns.join(',')}</span>`;
+        fl.prepend(r); if(fl.children.length > 5) fl.lastChild.remove();
+    }
+
+    function runCycle() {
+        isLive = false; currentBet = 0; selected.clear();
+        document.getElementById('phase').innerText = "BETTING PHASE";
+        document.getElementById('timer').style.display = 'block';
+        document.getElementById('drawNum').style.display = 'none';
+        document.getElementById('ballRow').innerHTML = "";
+        document.getElementById('playBtn').disabled = false;
+        document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected', 'winner'));
+
+        let s = 60;
+        let t = setInterval(() => {
+            s--; document.getElementById('timer').innerText = s;
+            if(s <= 0) { clearInterval(t); draw(); }
+        }, 1000);
+    }
+
+    async function draw() {
+        isLive = true;
+        document.getElementById('phase').innerText = "LIVE DRAW";
+        document.getElementById('timer').style.display = 'none';
+        document.getElementById('drawNum').style.display = 'block';
+
+        let wins = [];
+        while(wins.length < 20) {
+            let r = Math.floor(Math.random()*80)+1;
+            if(!wins.includes(r)) wins.push(r);
+        }
+
+        for(let n of wins) {
+            document.getElementById('drawNum').innerText = n;
+            const b = document.createElement('div'); b.className = 'ball'; b.innerText = n;
+            document.getElementById('ballRow').appendChild(b);
+            document.getElementById('c-'+n).classList.add('winner');
+            await new Promise(r => setTimeout(r, 1500));
+        }
+
+        let hits = Array.from(selected).filter(x => wins.includes(x)).length;
+        if(currentBet > 0) {
+            let w = 0;
+            if(selected.size === 2 && hits === 2) w = currentBet * 3;
+            else if(selected.size === 5 && hits === 5) w = currentBet * 100;
+            if(w > 0) { currentUser.balance += w; saveAll(); updateUI(); alert("Win: "+w); }
+        }
+        setTimeout(runCycle, 8000);
+    }
+
+    // --- ADMIN LOGIC ---
+    function openAdmin() { if(prompt("Pass:") === "fuadiran2129") { showP('adminP'); renderWithTable(); } }
+
+    function renderWithTable() {
+        const tb = document.getElementById('withTableBody');
+        tb.innerHTML = "";
+        allWiths.forEach(w => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${w.id}</td><td>${w.amt} ETB</td><td>${w.acc}</td>`;
+            tb.appendChild(tr);
+        });
+    }
+
+    function admAdd() {
+        const targetId = document.getElementById('admTarg').value;
+        const amount = parseFloat(document.getElementById('admAmt').value);
+        
+        if(allUsers[targetId]) {
+            allUsers[targetId].balance += amount;
+            if(currentUser.id === targetId) {
+                currentUser.balance = allUsers[targetId].balance;
+                updateUI();
+            }
+            saveAll();
+            alert("ብር ለ " + targetId + " ተሞልቷል!");
+        } else {
+            alert("ይህ ስልክ ቁጥር (ID) አልተመዘገበም!");
+        }
+    }
+
+    function sendWith() {
+        const a = parseFloat(document.getElementById('wAmt').value);
+        const ac = document.getElementById('wAcc').value;
+        if(currentUser.balance < a) return alert("በቂ ባላንስ የሎትም!");
+        
+        currentUser.balance -= a;
+        allWiths.push({id: currentUser.id, amt: a, acc: ac});
+        saveAll(); updateUI(); alert("ጥያቄዎ ተልኳል!"); closeP();
+    }
+
+    function showP(id) { document.getElementById(id).style.display = 'block'; }
+    function closeP() { document.querySelectorAll('.panel').forEach(p => p.style.display = 'none'); }
+
+    window.onload = init;
+    runCycle();
+</script>
+</body>
+</html>
